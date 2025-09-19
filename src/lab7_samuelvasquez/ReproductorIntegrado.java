@@ -18,14 +18,17 @@ public class ReproductorIntegrado extends JPanel {
     private boolean isPlaying = false;
     private boolean isPaused = false;
     
+    // Variables para manejar la posición de pausa
+    private int frameInicioPausa = 0;
+    private int framesTotales = 0;
     
     private JLabel lblCaratula;
     private JLabel lblTitulo;
     private JLabel lblArtista;
-    private JButton btnPlayStop;
+    private JButton btnPlayPause;
+    private JButton btnStop;
     private JProgressBar barraProgreso;
     private JLabel lblTiempo;
-    
     
     private Timer timerUI;
     private int tiempoTranscurrido = 0;
@@ -73,15 +76,20 @@ public class ReproductorIntegrado extends JPanel {
         panelCentral.setBackground(new Color(40, 40, 40));
         panelCentral.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
-      
-        JPanel panelControles = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        // Panel de controles con dos botones
+        JPanel panelControles = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         panelControles.setBackground(new Color(40, 40, 40));
 
-        btnPlayStop = crearBotonControl("▶");
-        btnPlayStop.setEnabled(false);
-        panelControles.add(btnPlayStop);
-
+        btnPlayPause = crearBotonControl("▶", new Color(29, 185, 84));
+        btnPlayPause.setEnabled(false);
         
+        btnStop = crearBotonControl("⏹", new Color(220, 53, 69));
+        btnStop.setEnabled(false);
+
+        panelControles.add(btnPlayPause);
+        panelControles.add(btnStop);
+
+        // Panel de progreso
         JPanel panelProgreso = new JPanel(new BorderLayout());
         panelProgreso.setBackground(new Color(40, 40, 40));
         panelProgreso.setBorder(BorderFactory.createEmptyBorder(15, 0, 0, 0));
@@ -110,31 +118,34 @@ public class ReproductorIntegrado extends JPanel {
         setupListeners();
     }
 
-    private JButton crearBotonControl(String texto) {
+    private JButton crearBotonControl(String texto, Color colorFondo) {
         JButton boton = new JButton(texto);
-        boton.setBackground(new Color(29, 185, 84));
+        boton.setBackground(colorFondo);
         boton.setForeground(Color.WHITE);
         boton.setFocusPainted(false);
         boton.setBorderPainted(false);
-        boton.setFont(new Font("Arial", Font.BOLD, 18));
-        boton.setPreferredSize(new Dimension(60, 60));
+        boton.setFont(new Font("Arial", Font.BOLD, 16));
+        boton.setPreferredSize(new Dimension(50, 50));
         boton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         
         boton.setBorder(BorderFactory.createEmptyBorder());
         boton.setContentAreaFilled(false);
         boton.setOpaque(true);
      
+        // Efecto hover específico para cada color
+        Color colorHover = colorFondo.brighter();
+        
         boton.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
                 if (boton.isEnabled()) {
-                    boton.setBackground(new Color(35, 200, 95));
+                    boton.setBackground(colorHover);
                 }
             }
 
             @Override
             public void mouseExited(java.awt.event.MouseEvent e) {
-                boton.setBackground(new Color(29, 185, 84));
+                boton.setBackground(colorFondo);
             }
         });
         
@@ -142,12 +153,16 @@ public class ReproductorIntegrado extends JPanel {
     }
 
     private void setupListeners() {
-        btnPlayStop.addActionListener(e -> {
+        btnPlayPause.addActionListener(e -> {
             if (isPlaying) {
-                stop();
+                pause();
             } else {
                 play();
             }
+        });
+        
+        btnStop.addActionListener(e -> {
+            stop();
         });
     }
 
@@ -175,13 +190,15 @@ public class ReproductorIntegrado extends JPanel {
         this.cancionActual = cancion;
         this.duracionTotal = (int) cancion.getDuracionSegundos();
         this.tiempoTranscurrido = 0;
+        this.frameInicioPausa = 0;
        
         lblCaratula.setIcon(cancion.getCaratula());
         lblTitulo.setText(cancion.getTitle());
         lblArtista.setText(cancion.getArtist());
         
-        btnPlayStop.setEnabled(true);
-        btnPlayStop.setText("▶");
+        btnPlayPause.setEnabled(true);
+        btnStop.setEnabled(true);
+        btnPlayPause.setText("▶");
         
         actualizarUI();
     }
@@ -189,7 +206,14 @@ public class ReproductorIntegrado extends JPanel {
     private void play() {
         if (cancionActual == null) return;
         
-        stop(); 
+        // Si estamos pausados, continuar desde donde se pausó
+        if (isPaused) {
+            resume();
+            return;
+        }
+        
+        // Detener cualquier reproducción actual
+        stop();
         
         try {
             FileInputStream fis = new FileInputStream(cancionActual.getPath());
@@ -200,32 +224,42 @@ public class ReproductorIntegrado extends JPanel {
                 @Override
                 public void playbackStarted(PlaybackEvent evt) {
                     isPlaying = true;
+                    isPaused = false;
                     SwingUtilities.invokeLater(() -> {
-                        btnPlayStop.setText("⏹");
+                        btnPlayPause.setText("⏸");
                         timerUI.start();
                     });
                 }
 
                 @Override
                 public void playbackFinished(PlaybackEvent evt) {
-                    isPlaying = false;
-                    SwingUtilities.invokeLater(() -> {
-                        stop();
-                    });
+                    if (isPlaying) { // Solo si terminó naturalmente
+                        SwingUtilities.invokeLater(() -> {
+                            stop();
+                        });
+                    }
                 }
             });
             
             reproductorThread = new Thread(() -> {
                 try {
-                    player.play();
+                    if (frameInicioPausa > 0) {
+                        // Reproducir desde el frame donde se pausó
+                        player.play(frameInicioPausa, Integer.MAX_VALUE);
+                    } else {
+                        // Reproducir desde el inicio
+                        player.play();
+                    }
                 } catch (Exception e) {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(this, 
-                            "Error al reproducir: " + e.getMessage(), 
-                            "Error", 
-                            JOptionPane.ERROR_MESSAGE);
-                        stop();
-                    });
+                    if (isPlaying) { // Solo mostrar error si realmente hubo un problema
+                        SwingUtilities.invokeLater(() -> {
+                            JOptionPane.showMessageDialog(this, 
+                                "Error al reproducir: " + e.getMessage(), 
+                                "Error", 
+                                JOptionPane.ERROR_MESSAGE);
+                            stop();
+                        });
+                    }
                 }
             });
             
@@ -237,6 +271,39 @@ public class ReproductorIntegrado extends JPanel {
                 "Error", 
                 JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void pause() {
+        if (!isPlaying) return;
+        
+        isPaused = true;
+        isPlaying = false;
+        
+        // Calcular el frame aproximado donde pausar
+        if (duracionTotal > 0) {
+            frameInicioPausa = (int) ((double) tiempoTranscurrido / duracionTotal * framesTotales);
+        }
+        
+        if (player != null) {
+            player.close();
+        }
+        
+        if (reproductorThread != null && reproductorThread.isAlive()) {
+            reproductorThread.interrupt();
+        }
+        
+        if (timerUI != null) {
+            timerUI.stop();
+        }
+        
+        btnPlayPause.setText("▶");
+    }
+
+    private void resume() {
+        if (!isPaused) return;
+        
+        isPaused = false;
+        play(); // Reutilizar el método play que ya maneja la lógica de frameInicioPausa
     }
 
     private void stop() {
@@ -252,12 +319,13 @@ public class ReproductorIntegrado extends JPanel {
         isPlaying = false;
         isPaused = false;
         tiempoTranscurrido = 0;
+        frameInicioPausa = 0;
         
         if (timerUI != null) {
             timerUI.stop();
         }
         
-        btnPlayStop.setText("▶");
+        btnPlayPause.setText("▶");
         
         actualizarUI();
     }
@@ -288,16 +356,16 @@ public class ReproductorIntegrado extends JPanel {
         lblTiempo.setText("0:00 / 0:00");
         barraProgreso.setValue(0);
         
-        btnPlayStop.setEnabled(false);
-        btnPlayStop.setText("▶");
+        btnPlayPause.setEnabled(false);
+        btnStop.setEnabled(false);
+        btnPlayPause.setText("▶");
     }
 
-   
+    // Getters
     public Cancion getCancionActual() {
         return cancionActual;
     }
 
-    
     public boolean isPlaying() {
         return isPlaying;
     }

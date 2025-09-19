@@ -26,17 +26,16 @@ public class AgregarCancionDialog extends JDialog {
     public AgregarCancionDialog(JFrame parent, GestorArchivos gestorArchivos) {
         super(parent, "Agregar Nueva Canción", true);
 
-        // --- Configuración General del Diálogo ---
+      
         setSize(500, 350);
         setLocationRelativeTo(parent);
         getContentPane().setBackground(BACKGROUND_COLOR);
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 10, 5, 10); // Espaciado entre componentes
+        gbc.insets = new Insets(5, 10, 5, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // --- Creación y Estilizado de Componentes ---
-        // Labels
+     
         JLabel lblCodigo = crearLabelEstilizado("Código Único:");
         JLabel lblTitulo = crearLabelEstilizado("Título:");
         JLabel lblArtista = crearLabelEstilizado("Artista:");
@@ -44,7 +43,6 @@ public class AgregarCancionDialog extends JDialog {
         JLabel lblMp3 = crearLabelEstilizado("Archivo MP3:");
         JLabel lblCaratula = crearLabelEstilizado("Archivo Carátula:");
 
-        // TextFields
         txtCodigo = crearTextFieldEstilizado();
         txtTitulo = crearTextFieldEstilizado();
         txtArtista = crearTextFieldEstilizado();
